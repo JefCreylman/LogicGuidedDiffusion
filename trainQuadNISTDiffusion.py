@@ -5,7 +5,7 @@ from datetime import datetime
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
-from src.QuadNISTClassifier import QuadNISTClassifier
+from src.QuadNISTDiffusion import QuadNISTDiffusion
 from data.data_generators.QuadNIST import QuadNIST
 
 
@@ -22,28 +22,29 @@ validation_set = QuadNIST(train=False, root='./data')
 training_loader = DataLoader(training_set, batch_size=BATCH_SIZE, shuffle=True)
 validation_loader = DataLoader(validation_set, batch_size=BATCH_SIZE, shuffle=True)
 
-model = QuadNISTClassifier().to(device)
+model = QuadNISTDiffusion().to(device)
 
 optimizer = torch.optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
 
 def train_one_epoch(epoch_index, tb_writer):
     running_loss = 0.
+    total_loss = 0.
     last_loss = 0.
 
     for i, data in enumerate(training_loader):
-        inputs, labels = data
-        inputs, labels = inputs.to(device), {'digit': labels['digit'].to(device), 'quadrant': labels['quadrant'].to(device)}
+        inputs, _ = data
+        inputs = inputs.to(device)
 
         optimizer.zero_grad()
 
-        inputs = inputs.reshape(inputs.shape[0], -1)
-
-        loss = model.calculate_loss(inputs, labels)
+        loss = model.calculate_loss(inputs)
         loss.backward()
 
         optimizer.step()
 
         running_loss += loss.item()
+        total_loss += loss.item()
+
         if i%1000 == 999:
             last_loss = running_loss / 1000 # loss per batch
             print(f'  batch {i + 1} loss: {last_loss}')
@@ -51,7 +52,9 @@ def train_one_epoch(epoch_index, tb_writer):
             tb_writer.add_scalar('Loss/train', last_loss, tb_x)
             running_loss = 0.
 
-    return last_loss
+        avg_loss = total_loss / len(training_loader)
+
+    return last_loss, avg_loss
 
 timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
 writer = SummaryWriter(f'runs/QuadNIST_trainer_{timestamp}')
@@ -65,7 +68,7 @@ for epoch in range(EPOCHS):
     print(f'EPOCH {epoch_number + 1}:')
 
     model.train(True)
-    last_loss = train_one_epoch(epoch_number, writer)
+    last_loss, avg_loss = train_one_epoch(epoch_number, writer)
 
     running_vloss = 0.0
 
@@ -73,16 +76,15 @@ for epoch in range(EPOCHS):
 
     with torch.no_grad():
         for i, vdata in enumerate(validation_loader):
-            vinputs, vlabels = vdata
-            vinputs, vlabels = vinputs.to(device), {'digit': vlabels['digit'].to(device), 'quadrant': vlabels['quadrant'].to(device)}
-            vinputs = vinputs.reshape(vinputs.shape[0], -1)
-            vloss = model.calculate_loss(vinputs, vlabels)
+            vinputs, _ = vdata
+            vinputs = vinputs.to(device)
+            vloss = model.calculate_loss(vinputs)
             running_vloss += vloss
 
     avg_vloss = running_vloss / (i+1)
-    print(f'LOSS train {last_loss} valid {avg_vloss}')
+    print(f'LOSS train {avg_loss} valid {avg_vloss}')
 
-    writer.add_scalars('Training vs. Validation Loss', {'Training' : last_loss, 'Validation' : avg_vloss}, epoch_number + 1)
+    writer.add_scalars('Training vs. Validation Loss', {'Training' : avg_loss, 'Validation' : avg_vloss}, epoch_number + 1)
 
     writer.flush()
 

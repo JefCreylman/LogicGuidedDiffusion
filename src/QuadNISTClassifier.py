@@ -1,4 +1,3 @@
-import torch
 from torch import nn
 
 class QuadNISTClassifier(nn.Module):
@@ -12,7 +11,6 @@ class QuadNISTClassifier(nn.Module):
         self.relu = nn.ReLU()
         self.outputD = nn.Linear(512, 10)
         self.outputQ = nn.Linear(512, 4)
-        #self.sigmoid = nn.Sigmoid()
         self.softmax = nn.LogSoftmax(dim=1)
 
     def forward(self, x):
@@ -21,9 +19,6 @@ class QuadNISTClassifier(nn.Module):
         
         d = self.outputD(x)
         q = self.outputQ(x)
-
-        #d = self.sigmoid(d)
-        #q = self.sigmoid(q)
 
         d = self.softmax(d)
         q = self.softmax(q)
