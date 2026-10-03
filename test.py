@@ -1,7 +1,7 @@
 import torch
-from data.data_generators.QuadrantMNIST import QuadrantMNIST
+from data.data_generators.QuadNIST import QuadNIST
 from torch.utils.data import DataLoader
-from src.QuadMNISTClassifier import QuadMNISTClassifier
+from src.QuadNISTClassifier import QuadNISTClassifier
 import matplotlib.pyplot as plt
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -9,9 +9,9 @@ print(f"Using: {device}")
 
 PATH = './models/QuadNISTClassif/20261003_110845/epoch_19.pt'
 
-validation_dataset = QuadrantMNIST(train=False, root='./data')
+validation_dataset = QuadNIST(train=False, root='./data')
 
-model = QuadMNISTClassifier()
+model = QuadNISTClassifier()
 model.load_state_dict(torch.load(PATH))
 model = model
 

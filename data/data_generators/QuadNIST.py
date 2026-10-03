@@ -2,7 +2,7 @@ import torch
 from torchvision import datasets, transforms
 from torch.utils.data import Dataset
 
-class QuadrantMNIST(Dataset):
+class QuadNIST(Dataset):
     def __init__(self, root, train = True):
         self.mnist = datasets.MNIST(
             root = root,

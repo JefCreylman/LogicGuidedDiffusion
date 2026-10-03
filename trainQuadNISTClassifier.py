@@ -5,24 +5,24 @@ from datetime import datetime
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
-from src.QuadMNISTClassifier import QuadMNISTClassifier
-from data.data_generators.QuadrantMNIST import QuadrantMNIST
+from src.QuadNISTClassifier import QuadNISTClassifier
+from data.data_generators.QuadNIST import QuadNIST
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using: {device}")
 
 BATCH_SIZE = 64
-EPOCHS = 20
+EPOCHS = 1
 PATIENCE = 1
 
-training_set = QuadrantMNIST(train=True, root='./data')
-validation_set = QuadrantMNIST(train=False, root='./data')
+training_set = QuadNIST(train=True, root='./data')
+validation_set = QuadNIST(train=False, root='./data')
 
 training_loader = DataLoader(training_set, batch_size=BATCH_SIZE, shuffle=True)
 validation_loader = DataLoader(validation_set, batch_size=BATCH_SIZE, shuffle=True)
 
-model = QuadMNISTClassifier().to(device)
+model = QuadNISTClassifier().to(device)
 
 optimizer = torch.optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
 
