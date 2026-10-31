@@ -167,7 +167,7 @@ class QuadNISTDiffusion(nn.Module):
 
         return loss
 
-    def sample(self, etas, budgets, noise, classifier=None, omega=1, target=1):
+    def sample(self, etas, budgets, noise, classifier=None, omega=1, target=1, omega_scaling=False):
         '''
         Sample the diffusion model using LD
 
@@ -211,7 +211,11 @@ class QuadNISTDiffusion(nn.Module):
                     grad = torch.autograd.grad(loss, x)[0]
                     x = x.detach()
 
-                    score = self(x, l_tensor) - omega * grad
+                    if not omega_scaling:
+                        score = self(x, l_tensor) - omega * grad
+                    else:
+                        score = self(x, l_tensor) - (self.sigmas[l]/self.sigmas[0]) * omega * grad
+                    
                     x = x + etas[l]*score + np.sqrt(2*etas[l])*e
                 else:
                     x = x + etas[l]*self(x, l_tensor) + np.sqrt(2*etas[l])*e

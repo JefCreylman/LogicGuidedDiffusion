@@ -83,7 +83,7 @@ def solve_ld_eta():
 
 if __name__ == "__main__":
     D = 56*56
-    LOGSIGMA1 = 1.45
+    LOGSIGMA1 = 0
     LOGSIGMAL = -2.
     solve_num_timesteps(D, LOGSIGMA1, LOGSIGMAL)
     solve_ld_eta()

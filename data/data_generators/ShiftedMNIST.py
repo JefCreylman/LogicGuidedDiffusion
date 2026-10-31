@@ -26,6 +26,7 @@ class ShiftedMNIST(Dataset):
             download=True,
             transform=transforms.ToTensor()
         )
+        self.stochastic = stochastic
         if not stochastic:
             self.length = len(self.mnist)*28*28
         else:
@@ -52,24 +53,25 @@ class ShiftedMNIST(Dataset):
         if self.stochastic:
             original_image, original_label = self.mnist[idx%len(self.mnist)]
 
-            image = torch.zeros((56, 56))
+            image = torch.zeros((1, 56, 56))
 
-            row = torch.randint(0, 28)
-            column = torch.randint(0, 28)
+            row = torch.randint(0, 28, (1,)).item()
+            column = torch.randint(0, 28, (1,)).item()
 
-            image[row:row+28, column:column+28] = original_image
+            image[0, row:row+28, column:column+28] = original_image
         else:
             original_image, original_label = self.mnist[idx//(28*28)]
 
-            image = torch.zeros((56, 56))
+            image = torch.zeros((1, 56, 56))
 
             row = (idx//28)%28
             column = idx%28
             
-            image[row:row+28, column:column+28] = original_image
+            image[0, row:row+28, column:column+28] = original_image
 
 
-        label = torch.zeros(10, image.shape[0], image.shape[1])
-        label[original_label] = image
+        label = torch.full((image.shape[1], image.shape[2]), 10, dtype=torch.long)
+        mask = torch.ceil(image).bool().squeeze(0)
+        label[mask] = original_label
  
         return image, label

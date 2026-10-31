@@ -7,31 +7,6 @@ from torch.utils.data import DataLoader
 from src.QuadNISTClassifier import NoiseAwareQuadNISTClassifier
 from data.data_generators.QuadNIST import QuadNIST
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(f"Using: {device}")
-
-BATCH_SIZE = 64
-EPOCHS = 20
-PATIENCE = 5
-
-'''
-Following parameters should correspond to those of the diffusion model you are using
-'''
-LOGSIGMA1 = 1.45
-NUM_TIMESTEPS = 206
-sigmas = torch.logspace(start=0, end=-2, steps=NUM_TIMESTEPS).tolist()
-
-#Load datasets
-training_set = QuadNIST(train=True, root='./data')
-validation_set = QuadNIST(train=False, root='./data')
-
-training_loader = DataLoader(training_set, batch_size=BATCH_SIZE, shuffle=True)
-validation_loader = DataLoader(validation_set, batch_size=BATCH_SIZE, shuffle=True)
-
-#Prepare model and optimizer
-model = NoiseAwareQuadNISTClassifier().to(device)
-optimizer = torch.optim.Adam(model.parameters(), lr=3e-4)
-
 
 def train_one_epoch(epoch_index):
     '''
@@ -77,55 +52,86 @@ def train_one_epoch(epoch_index):
 
     return last_loss
 
-#Prepare timestamp for logging and saving model
-timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-epoch_number = 0
 
-best_vloss = 1_000_000.     #Approximation for +infinity (loss should always be way lower)
+if __name__ == "__main__":
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using: {device}")
 
-no_improvement = 0          #Tracker for PATIENCE
-
-for epoch in range(EPOCHS):
     '''
-    Per epoch:
-        1. Train one epoch
-        2. Check validation loss
-        3. Check for validation loss improvement. If there is none, don't save model (Should probably be changed for crashes with high PATIENCE)
-        4. If no improvement for longer than PATIENCE, stop training (i.e. Early stopping with patience)
+    TRAINING PARAMETERS:
     '''
-    print(f'EPOCH {epoch_number + 1}:')
+    BATCH_SIZE = 256
+    EPOCHS = 40
+    PATIENCE = 5
+    NUM_WORKERS = 0
 
-    model.train(True)
-    last_loss = train_one_epoch(epoch_number)
+    '''
+    Following parameters should correspond to those of the diffusion model you are using
+    '''
+    LOGSIGMA1 = 0
+    NUM_TIMESTEPS = 120
+    sigmas = torch.logspace(start=0, end=-2, steps=NUM_TIMESTEPS).tolist()
 
-    running_vloss = 0.0
+    #Load datasets
+    training_set = QuadNIST(train=True, root='./data')
+    validation_set = QuadNIST(train=False, root='./data')
 
-    model.eval()
+    training_loader = DataLoader(training_set, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS, pin_memory=True)
+    validation_loader = DataLoader(validation_set, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS, pin_memory=True)
 
-    with torch.no_grad():
-        for i, vdata in enumerate(validation_loader):
-            vinputs, vlabels = vdata
-            vinputs, vlabels = vinputs.to(device), {'digit': vlabels['digit'].to(device), 'quadrant': vlabels['quadrant'].to(device)}
-            vinputs = vinputs.reshape(vinputs.shape[0], -1)
-            vloss = model.calculate_loss(vinputs, vlabels)
-            running_vloss += vloss.item()
+    #Prepare model and optimizer
+    model = NoiseAwareQuadNISTClassifier().to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=3e-4)
 
-    avg_vloss = running_vloss / (i+1)
-    print(f'LOSS train {last_loss} valid {avg_vloss}')
+    #Prepare timestamp for logging and saving model
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    epoch_number = 0
 
-    if avg_vloss < best_vloss:
-        no_improvement = 0
-        best_vloss = avg_vloss
-        model_path = f'./models/NoiseAwareQuadNISTClassif/{timestamp}'
-        os.makedirs(model_path, exist_ok=True)
-        torch.save(model.state_dict(), os.path.join(model_path, f'epoch_{epoch_number}.pt'))
-    elif PATIENCE >= 0: 
-        no_improvement += 1
-        print(f'LOSS did not improve for epoch {epoch_number + 1}')
-        if no_improvement > PATIENCE:
-            print(f'LOSS did not improve for {no_improvement} epochs, breaking due to early stopping')
-            break
+    best_vloss = 1_000_000.     #Approximation for +infinity (loss should always be way lower)
 
-    print("",flush=True)
+    no_improvement = 0          #Tracker for PATIENCE
 
-    epoch_number += 1
+    for epoch in range(EPOCHS):
+        '''
+        Per epoch:
+            1. Train one epoch
+            2. Check validation loss
+            3. Check for validation loss improvement. If there is none, don't save model (Should probably be changed for crashes with high PATIENCE)
+            4. If no improvement for longer than PATIENCE, stop training (i.e. Early stopping with patience)
+        '''
+        print(f'EPOCH {epoch_number + 1}:')
+
+        model.train(True)
+        last_loss = train_one_epoch(epoch_number)
+
+        running_vloss = 0.0
+
+        model.eval()
+
+        with torch.no_grad():
+            for i, vdata in enumerate(validation_loader):
+                vinputs, vlabels = vdata
+                vinputs, vlabels = vinputs.to(device), {'digit': vlabels['digit'].to(device), 'quadrant': vlabels['quadrant'].to(device)}
+                vinputs = vinputs.reshape(vinputs.shape[0], -1)
+                vloss = model.calculate_loss(vinputs, vlabels)
+                running_vloss += vloss.item()
+
+        avg_vloss = running_vloss / (i+1)
+        print(f'LOSS train {last_loss} valid {avg_vloss}')
+
+        if avg_vloss < best_vloss:
+            no_improvement = 0
+            best_vloss = avg_vloss
+            model_path = f'./models/NoiseAwareQuadNISTClassif/{timestamp}'
+            os.makedirs(model_path, exist_ok=True)
+            torch.save(model.get_checkpoint(), os.path.join(model_path, f'epoch_{epoch_number}.pt'))
+        elif PATIENCE >= 0: 
+            no_improvement += 1
+            print(f'LOSS did not improve for epoch {epoch_number + 1}')
+            if no_improvement > PATIENCE:
+                print(f'LOSS did not improve for {no_improvement} epochs, breaking due to early stopping')
+                break
+
+        print("",flush=True)
+
+        epoch_number += 1
