@@ -189,8 +189,6 @@ class QuadNISTDiffusion(nn.Module):
         x = noise
 
         guided = isinstance(classifier, nn.Module)
-
-        print("Guided" if guided else "Unguided")
         noiseAware = True
 
         for l in range(self.num_timesteps):
@@ -198,7 +196,7 @@ class QuadNISTDiffusion(nn.Module):
             l_tensor = torch.full((x.shape[0],), l, dtype=torch.long, device=x.device)
             for _ in range(budgets[l]):
                 e = torch.randn_like(x)
-                if guided:
+                if guided and omega != 0:
                     x.requires_grad_(True)
 
                     with torch.enable_grad():

@@ -113,6 +113,16 @@ class NoiseAwareQuadNISTClassifier(nn.Module):
         Function for calculating losses without cluttering training script
         '''
         output = self(x, sigma)
+
+        if callable(label):
+            log_truth = label(output)       # Shape: (B,), log-probabilities <= 0
+            loss = -log_truth               # Positive penalty >= 0 to minimize
+            if reduction == "sum":
+                return loss.sum()
+            elif reduction == "mean":
+                return loss.mean()
+            return loss
+
         loss_fn = nn.NLLLoss(reduction=reduction)
 
         loss_d = loss_fn(output['digit'], label['digit'])

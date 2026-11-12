@@ -57,3 +57,77 @@ class QuadNIST(Dataset):
         label = {'digit': original_label, 'quadrant': quadrant + 1}
  
         return image, label
+
+
+
+class FilteredQuadNIST(Dataset):
+    '''
+    Modified MNIST Datset with digits in one of four quadrants of the image
+    
+    Args:
+        root (str or pathlib.Path):
+            Root directory of dataset where MNIST/raw/train-images-idx3-ubyte and MNIST/raw/t10k-images-idx3-ubyte exist.
+        
+        train (bool, optional):
+            If True, creates dataset from train-images-idx3-ubyte, otherwise from t10k-images-idx3-ubyte.
+
+        combinations (list):
+            List if allowed quadrant digit combinations
+        '''        
+    def __init__(self, root, train = True, combinations=[], len=240_000):
+        self.mnist = datasets.MNIST(
+            root = root,
+            train = train,
+            download=True,
+            transform=transforms.ToTensor()
+        )
+
+        self.combinations = combinations
+        self.tracker = 0
+        self.len = len
+
+    def __len__(self):
+        return self.len
+
+    def __getitem__(self, idx):
+        '''
+        Returns item with given id
+
+        Args:
+            idx (int):
+                id of requested item
+
+        Returns:
+            image (Tensor):
+                tensor of pixel values
+            label (dict):
+                contains 'digit', the original mnist label, and 'quadrant', the quadrant the digit is in
+        '''
+        real_idx = (self.tracker+idx) % len(self.mnist)
+        original_image, original_label = self.mnist[real_idx//4]
+        quadrant = real_idx % 4
+        while (original_label, quadrant+1) not in self.combinations:
+            self.tracker += 1
+            real_idx = (self.tracker+idx) % len(self.mnist)
+            original_image, original_label = self.mnist[real_idx//4]
+            quadrant = real_idx % 4
+
+
+        
+        
+        match quadrant:
+            case 0:
+                quadrantTensor = torch.tensor([[0., 1.],[0., 0.]])
+            case 1:
+                quadrantTensor = torch.tensor([[1., 0.],[0., 0.]])
+            case 2:
+                quadrantTensor = torch.tensor([[0., 0.],[1., 0.]])
+            case 3:
+                quadrantTensor = torch.tensor([[0., 0.],[0., 1.]])
+            case _:
+                print(f"Case not allowed: {quadrant} from {real_idx}")
+
+        image = torch.kron(quadrantTensor, original_image)
+        label = {'digit': original_label, 'quadrant': quadrant + 1}
+ 
+        return image, label

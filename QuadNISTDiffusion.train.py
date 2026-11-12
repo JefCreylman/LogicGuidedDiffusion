@@ -60,10 +60,12 @@ if __name__ == "__main__":
     TRAINING PARAMETERS:
     '''
     BATCH_SIZE = 128
-    EPOCHS = 50
-    PATIENCE = 5
+    EPOCHS = 196        # 196 is an equal amount of data seen to the ShiftedMNIST one pass model
+    PATIENCE = -1
     NUM_WORKERS = 0         
 
+    PATH = './models/QuadNISTDiffusion/20261104_163409/epoch_187.pt'
+    START_EPOCH = 188 if (PATH is not None) else 0
     '''
     MODEL PARAMETERS:
         Sigma1 Changed back to 1, following comment explains how it should be chosen according to NCSNv2    
@@ -92,18 +94,23 @@ if __name__ == "__main__":
     validation_loader = DataLoader(validation_set, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS, pin_memory=True)
 
     #Prepare model and optimizer
-    model = QuadNISTDiffusion(sigmas).to(device)
+    
+    if PATH is not None:
+        model = QuadNISTDiffusion.load_model_from_checkpoint(torch.load(PATH)).to(device)
+    else:
+        model = QuadNISTDiffusion(sigmas).to(device)
+
     optimizer = torch.optim.Adam(model.parameters(), lr=2e-4)
 
     #Prepare timestamp for logging and saving model
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    epoch_number = 0
+    epoch_number = 0 if PATH is None else START_EPOCH
 
     best_vloss = 1_000_000.     #Approximation for +infinity (loss should always be way lower)
 
     no_improvement = 0          #Tracker for PATIENCE
 
-    for epoch in range(EPOCHS):
+    for epoch in range(EPOCHS - START_EPOCH):
         '''
         Per epoch:
             1. Train one epoch
@@ -130,10 +137,10 @@ if __name__ == "__main__":
         avg_vloss = running_vloss / (i+1)
         print(f'LOSS train {avg_loss} valid {avg_vloss}')
 
-        if avg_vloss < best_vloss:
+        if avg_vloss < best_vloss or PATIENCE < 0:
             no_improvement = 0
             best_vloss = avg_vloss
-            model_path = f'./models/QuadNISTDiffusion/{timestamp}'
+            model_path = f'./models/QuadNISTDiffusion/{timestamp}' if PATH is None else os.path.dirname(PATH)
             os.makedirs(model_path, exist_ok=True)
             torch.save(model.get_checkpoint(), os.path.join(model_path, f'epoch_{epoch_number}.pt'))
         elif PATIENCE >= 0: 
@@ -142,6 +149,7 @@ if __name__ == "__main__":
             if no_improvement > PATIENCE:
                 print(f'LOSS did not improve for {no_improvement} epochs, breaking due to early stopping')
                 break
+        
 
         print("",flush=True)
 
